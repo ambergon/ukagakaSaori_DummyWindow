@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <regex>
+#include <thread>
 
 
 //#define Debug
@@ -16,6 +17,9 @@ FILE* ConsoleWindow;
 typedef void* HGLOBAL;
 char* resBuf;
 char* SaoriDirectory;
+
+
+
 
 //{{{
 int Message( char* Argument0 , char* Argument1 , int pattern , int icon ){
@@ -33,6 +37,8 @@ int Message( char* Argument0 , char* Argument1 , int pattern , int icon ){
 
     return res;
 }
+
+
 //}}}
 //{{{
 int ZenToHanToInt( char* pattern ){
@@ -144,6 +150,7 @@ extern "C" __declspec(dllexport) HGLOBAL __cdecl request(HGLOBAL h, long *len){
     char* Argument1 = NULL;
     char* Argument2 = NULL;
     char* Argument3 = NULL;
+    char* Argument4 = NULL;
 
     char  sepLine[]    = "\r\n";
     char  sepLR[] = ": ";
@@ -190,6 +197,10 @@ extern "C" __declspec(dllexport) HGLOBAL __cdecl request(HGLOBAL h, long *len){
             Argument3 = (char*)calloc( Rsize + 1 , sizeof(char) );
             memcpy( Argument3 , &tp[ Lsize + strlen( sepLR ) ] , Rsize );
         
+        } else if ( strcmp( L , "Argument4" ) == 0 ) {
+            Argument4 = (char*)calloc( Rsize + 1 , sizeof(char) );
+            memcpy( Argument4 , &tp[ Lsize + strlen( sepLR ) ] , Rsize );
+
         //} else if ( strcomp( L , "" ) == 0 ) {
         }
         tp = strtok( NULL , sepLine );
@@ -225,18 +236,23 @@ extern "C" __declspec(dllexport) HGLOBAL __cdecl request(HGLOBAL h, long *len){
         }
     }
 
+    string Res;
     if ( Argument0 != NULL && Argument1 != NULL ){
-        msgRes = Message( Argument0 , Argument1 , ChoisePattern , ChoiseIcon );
+        if ( Argument4 == NULL ){
+            msgRes = Message( Argument0 , Argument1 , ChoisePattern , ChoiseIcon );
+            //resultで返すのはめんどくさいと判断した。
+            Res = "SAORI/1.0 200 OK\r\nValue0: " + to_string( msgRes ) + "\r\n\r\n";
+            int i = strlen( Res.c_str() );
+            char* res_buf;
+            res_buf = (char*)calloc( i + 1 , sizeof(char) );
+            memcpy( res_buf , Res.c_str() , i );
+            resBuf = res_buf;
+        } else {
+            thread th_a( Message , Argument0 , Argument1 , ChoisePattern , ChoiseIcon  );
+            th_a.detach();
+        }
     }
     
-    //resultで返すのはめんどくさいと判断した。
-    string Res;
-    Res = "SAORI/1.0 200 OK\r\nValue0: " + to_string( msgRes ) + "\r\n\r\n";
-    int i = strlen( Res.c_str() );
-    char* res_buf;
-    res_buf = (char*)calloc( i + 1 , sizeof(char) );
-    memcpy( res_buf , Res.c_str() , i );
-    resBuf = res_buf;
     
 
     //Saoriにおいて、Charsetはshift-jis決め打ちである。
@@ -252,6 +268,7 @@ extern "C" __declspec(dllexport) HGLOBAL __cdecl request(HGLOBAL h, long *len){
     if ( Argument1 != NULL ){ free( Argument1 ); }
     if ( Argument2 != NULL ){ free( Argument2 ); }
     if ( Argument3 != NULL ){ free( Argument3 ); }
+    if ( Argument4 != NULL ){ free( Argument4 ); }
     
     //pluginは2.0で返す。
     //char res_buf[] = "SAORI/1.0 204 No Content";
